@@ -50,8 +50,11 @@ def create_app(
 
     app = FastAPI(title="tep-historian", lifespan=lifespan)
 
+    # Endpoints são `async def` de propósito: rodam no event loop, o mesmo onde o coletor faz
+    # `buffer.append`. Um `def` comum iria para o threadpool do FastAPI e iteraria os deques
+    # enquanto o coletor os altera ("deque mutated during iteration").
     @app.get("/healthz")
-    def healthz():
+    async def healthz():
         return {
             "connected": state.connected,
             "last_sample_at": state.last_sample_at,
@@ -60,11 +63,11 @@ def create_app(
         }
 
     @app.get("/signals")
-    def signals():
+    async def signals():
         return {"keys": buffer.keys()}
 
     @app.post("/aggregate")
-    def aggregate(req: AggregateRequest):
+    async def aggregate(req: AggregateRequest):
         stats = buffer.aggregate(req.keys, req.window_s, now=time.monotonic())
         return {
             "window_s": req.window_s,
