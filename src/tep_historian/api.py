@@ -5,7 +5,7 @@ API HTTP do historian.
 - `GET  /signals`    → chaves disponíveis no buffer.
 - `POST /aggregate`  → estatísticas por janela para as chaves pedidas.
 
-O operator (`tep-operator`) consome `/aggregate`: ele pede só as chaves que a `CostFunction` e a
+O operator (`plant-supervisor`) consome `/aggregate`: ele pede só as chaves que a `CostFunction` e a
 `OperatingPolicy` ativas usam, e o historian não precisa saber o porquê.
 """
 

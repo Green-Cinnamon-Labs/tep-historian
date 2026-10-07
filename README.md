@@ -1,9 +1,9 @@
 # tep-historian
 
-Generic historian for the **TEP CPS Lab**. It collects every signal a plant publishes over OPC-UA and serves window statistics over HTTP. It's the middleware between the plant and the supervisory layer: Kubernetes never sees raw signals, only the verdicts that `tep-operator` derives from these aggregates.
+Generic historian for the **TEP CPS Lab**. It collects every signal a plant publishes over OPC-UA and serves window statistics over HTTP. It's the middleware between the plant and the supervisory layer: Kubernetes never sees raw signals, only the verdicts that `plant-supervisor` derives from these aggregates.
 
 ```
-tep-plant ──OPC-UA──▶ tep-historian ──HTTP──▶ tep-operator ──▶ Plant.status
+tep-plant ──OPC-UA──▶ tep-historian ──HTTP──▶ plant-supervisor ──▶ Plant.status
 ```
 
 It knows nothing about TEP. Every node under the `Signals` folder of the OPC-UA server becomes a series, keyed by its browse name (e.g. `xmeas.reactor.pressure`). Plant-specific knowledge lives only in the Kubernetes manifests (`CostFunction`, `OperatingPolicy`).
