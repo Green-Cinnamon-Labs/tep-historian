@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "tep-historian"
 version = "0.1.0"
-description = "Historian genérico — coleta sinais OPC-UA e serve estatísticas por janela via HTTP para o tep-operator"
+description = "Historian genérico — coleta sinais OPC-UA e serve estatísticas por janela via HTTP para o plant-supervisor"
 authors = []
 readme = "README.md"
 packages = [{ include = "tep_historian", from = "src" }]
