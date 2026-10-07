@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Historian: planta local (OPC-UA)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "tep_historian",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "OPCUA_ENDPOINT": "opc.tcp://127.0.0.1:4840/tep/server/",
+                "SAMPLE_INTERVAL_MS": "500",
+                "RETENTION_S": "3600",
+                "PORT": "8090"
+            }
+        }
+    ]
+}
