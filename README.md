@@ -33,7 +33,7 @@ curl -s localhost:8090/aggregate -H 'content-type: application/json' \
 }
 ```
 
-Unknown keys are listed in `missing`.
+Unknown keys are listed in `missing`. A known key with no samples in the window returns `count: 0` and `null` statistics.
 
 ### Control-loop performance
 
@@ -48,7 +48,7 @@ curl -s localhost:8090/loop-performance -H 'content-type: application/json' -d '
 
 Per loop it returns `pi`, the raw ratio `σ²_r / mse` (`ratio`), `mse`, the residual variance, `sigma_op` (standard deviation of the controller output, for the article's variability gate), and the article's parameters `n`, `b = ceil(T / t_s)`, `m = 2b`. `pi` is `null` with a `reason` when it can't be computed (`too_few_samples`, `zero_error`, `missing_signal`).
 
-The article prints the index as `σ²_r / mse` but describes PI = 1 for a predictable loop and 0 for white noise; that scale requires `1 − σ²_r / mse`, which is what is implemented (see `loop_performance.py`). A known key with no samples in the window returns `count: 0` and `null` statistics.
+The article prints the index as `σ²_r / mse` but describes PI = 1 for a predictable loop and 0 for white noise; that scale requires `1 − σ²_r / mse`, which is what is implemented (see `loop_performance.py`).
 
 ## Configuration
 
