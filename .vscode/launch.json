@@ -10,8 +10,8 @@
             "cwd": "${workspaceFolder}",
             "env": {
                 "OPCUA_ENDPOINT": "opc.tcp://127.0.0.1:4840/tep/server/",
-                "SAMPLE_INTERVAL_MS": "500",
-                "RETENTION_S": "3600",
+                "SAMPLE_INTERVAL_MS": "100",
+                "RETENTION_S": "900",
                 "PORT": "8090"
             }
         }
