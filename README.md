@@ -46,9 +46,11 @@ curl -s localhost:8090/loop-performance -H 'content-type: application/json' -d '
              "op": "valve.separator_underflow.position", "time_constant_s": 30}]}'
 ```
 
-Per loop it returns `pi`, the raw ratio `σ²_r / mse` (`ratio`), `mse`, the residual variance, `sigma_op` (standard deviation of the controller output, for the article's variability gate), and the article's parameters `n`, `b = ceil(T / t_s)`, `m = 2b`. `pi` is `null` with a `reason` when it can't be computed (`too_few_samples`, `zero_error`, `missing_signal`).
+Per loop it returns `pi`, the raw ratio `σ²_r / mse` (`ratio`), the loop's `offset` (mean error), `mse`, the residual variance, `sigma_op` (standard deviation of the controller output, for the article's variability gate), and the article's parameters `n`, `b = ceil(T / t_s)`, `m = 2b`. `pi` is `null` with a `reason` when it can't be computed (`too_few_samples`, `no_fluctuation`, `missing_signal`).
 
 The article prints the index as `σ²_r / mse` but describes PI = 1 for a predictable loop and 0 for white noise; that scale requires `1 − σ²_r / mse`, which is what is implemented (see `loop_performance.py`).
+
+One deliberate departure from the article: the article's loops are PIDs, with no steady-state error, while the TEP loops here are proportional and keep a constant offset. On the raw error that offset dominates `mse` and is "predicted" by the model's intercept, pushing PI toward 1 regardless of tuning. So `pi` is computed on the fluctuation around the mean error, the offset is returned as `offset`, and the raw-error index is kept as `pi_raw` for comparison only (spec issue #87).
 
 ## Configuration
 
