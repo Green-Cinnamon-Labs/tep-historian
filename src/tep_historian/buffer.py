@@ -76,6 +76,19 @@ class SignalBuffer:
             result[key] = _stats(values)
         return result
 
+    def series(self, keys: Iterable[str], window_s: float, now: float) -> dict[str, list[tuple[float, float]]]:
+        """Amostras brutas `(timestamp, valor)` de cada chave com `ts > now - window_s`, em ordem
+        de tempo. Chave desconhecida não aparece. O coletor grava todas as chaves no mesmo
+        instante a cada leitura, então séries de chaves diferentes compartilham os timestamps."""
+        if window_s <= 0:
+            raise ValueError("window_s precisa ser > 0")
+        start = now - window_s
+        return {
+            key: [(ts, v) for ts, v in self._series[key] if ts > start]
+            for key in keys
+            if key in self._series
+        }
+
     def _prune(self, now: float) -> None:
         cutoff = now - self.retention_s
         for series in self._series.values():

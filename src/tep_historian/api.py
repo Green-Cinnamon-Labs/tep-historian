@@ -4,9 +4,11 @@ API HTTP do historian.
 - `GET  /healthz`    → estado da coleta (conectado, última amostra, último erro).
 - `GET  /signals`    → chaves disponíveis no buffer.
 - `POST /aggregate`  → estatísticas por janela para as chaves pedidas.
+- `POST /loop-performance` → Predictability Index de cada malha de controle pedida.
 
-O operator (`plant-supervisor`) consome `/aggregate`: ele pede só as chaves que a `CostFunction` e a
-`OperatingPolicy` ativas usam, e o historian não precisa saber o porquê.
+O `plant-supervisor` consome os dois: pede só as chaves que a `CostFunction` e a `OperatingPolicy`
+ativas usam, e o historian não precisa saber o porquê. O historian calcula; quem julga (limiares,
+persistência) é o supervisor.
 """
 
 from __future__ import annotations
@@ -21,11 +23,26 @@ from pydantic import BaseModel, Field
 
 from .buffer import SignalBuffer
 from .collector import CollectorState, run_collector
+from .loop_performance import predictability_index, resample
 
 
 class AggregateRequest(BaseModel):
     keys: list[str] = Field(min_length=1)
     window_s: float = Field(gt=0)
+
+
+class LoopSpec(BaseModel):
+    name: str = Field(min_length=1)
+    pv: str = Field(min_length=1)
+    sp: float
+    op: str = Field(min_length=1)
+    time_constant_s: float = Field(gt=0)
+
+
+class LoopPerformanceRequest(BaseModel):
+    loops: list[LoopSpec] = Field(min_length=1)
+    window_s: float = Field(gt=0)
+    sample_interval_s: float = Field(gt=0)
 
 
 def create_app(
@@ -75,5 +92,27 @@ def create_app(
             "signals": {key: s.to_dict() for key, s in stats.items()},
             "missing": [key for key in req.keys if key not in stats],
         }
+
+    @app.post("/loop-performance")
+    async def loop_performance(req: LoopPerformanceRequest):
+        keys = {k for loop in req.loops for k in (loop.pv, loop.op)}
+        raw = buffer.series(keys, req.window_s, now=time.monotonic())
+        loops = {}
+        for loop in req.loops:
+            if loop.pv not in raw or loop.op not in raw:
+                loops[loop.name] = {"pi": None, "reason": "missing_signal"}
+                continue
+            # PV e OP alinhados pelo timestamp (o coletor grava todas as chaves no mesmo instante)
+            op_at = dict(raw[loop.op])
+            pairs = [(ts, pv) for ts, pv in raw[loop.pv] if ts in op_at]
+            error = resample([(ts, loop.sp - pv) for ts, pv in pairs], req.sample_interval_s)
+            op = resample([(ts, op_at[ts]) for ts, _ in pairs], req.sample_interval_s)
+            loops[loop.name] = predictability_index(
+                error,
+                op,
+                sample_interval_s=req.sample_interval_s,
+                time_constant_s=loop.time_constant_s,
+            ).to_dict()
+        return {"window_s": req.window_s, "connected": state.connected, "loops": loops}
 
     return app
