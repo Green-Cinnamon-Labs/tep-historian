@@ -15,6 +15,13 @@ e PI = 0 para ruído branco, e usa "PI < PI_L → mal sintonizada". Com σ²_r /
 invertida (erro previsível → resíduo pequeno → razão perto de 0). Implementamos
 `PI = 1 − σ²_r / mse`, que bate com a interpretação e os limiares do artigo, e devolvemos também a
 razão crua (`ratio`) para transparência.
+
+Desvio deliberado do artigo — o offset: as malhas do artigo são PID, sem erro em regime. As do TEP
+aqui são proporcionais (P) e deixam um offset constante (ex.: pressão do reator ~9.4 kPa abaixo do
+setpoint). Sobre o erro bruto, esse offset domina o mse e o intercepto do modelo AR o "prevê",
+empurrando o PI para 1 sem relação com a sintonia. Por isso o PI (`pi`) é calculado sobre a
+flutuação em torno da média, `ẽ = e − média(e)`, e o offset é devolvido à parte (`offset`). O PI
+sobre o erro bruto continua disponível como `pi_raw`, só para comparação. Ver spec #87.
 """
 
 from __future__ import annotations
@@ -32,6 +39,8 @@ class LoopResult:
 
     pi: float | None
     ratio: float | None
+    offset: float | None
+    pi_raw: float | None
     mse: float | None
     residual_var: float | None
     sigma_op: float | None
@@ -44,6 +53,8 @@ class LoopResult:
         return {
             "pi": self.pi,
             "ratio": self.ratio,
+            "offset": self.offset,
+            "pi_raw": self.pi_raw,
             "mse": self.mse,
             "residual_var": self.residual_var,
             "sigma_op": self.sigma_op,
@@ -66,6 +77,19 @@ def resample(series: list[tuple[float, float]], sample_interval_s: float) -> lis
     return [by_bin[k] for k in sorted(by_bin)]
 
 
+def _fit_pi(e: "np.ndarray", b: int, m: int, rows: int) -> tuple[float, float, float]:
+    """Ajuste AR da eq. 1 sobre `e`; devolve `(pi, ratio, residual_var)` com mse = média(e²)."""
+    mse = float(np.mean(e**2))
+    # Linha i: [1, e(t), e(t-1), ..., e(t-m+1)] com t = i + m - 1; alvo e(t + b)  (eq. 1)
+    lags = np.column_stack([e[m - 1 - j : m - 1 - j + rows] for j in range(m)])
+    x = np.column_stack([np.ones(rows), lags])
+    y = e[m - 1 + b : m - 1 + b + rows]
+    coef, *_ = np.linalg.lstsq(x, y, rcond=None)
+    residual_var = float(np.var(y - x @ coef))
+    ratio = residual_var / mse
+    return min(1.0, max(0.0, 1.0 - ratio)), ratio, residual_var
+
+
 def predictability_index(
     error: list[float],
     op: list[float],
@@ -74,7 +98,8 @@ def predictability_index(
     time_constant_s: float,
     min_mse: float = 1e-12,
 ) -> LoopResult:
-    """PI de uma malha a partir das séries já reamostradas em `sample_interval_s`."""
+    """PI de uma malha a partir das séries já reamostradas em `sample_interval_s`. O PI principal é
+    calculado sobre a flutuação do erro em torno da média; o offset sai à parte."""
     b = max(1, math.ceil(time_constant_s / sample_interval_s))
     m = 2 * b
     e = np.asarray(error, dtype=float)
@@ -83,20 +108,15 @@ def predictability_index(
 
     rows = n - m - b + 1
     if rows < m + 2:
-        return LoopResult(None, None, None, None, sigma_op, n, b, m, "too_few_samples")
+        return LoopResult(None, None, None, None, None, None, sigma_op, n, b, m, "too_few_samples")
 
-    mse = float(np.mean(e**2))
+    offset = float(np.mean(e))
+    pi_raw = _fit_pi(e, b, m, rows)[0] if float(np.mean(e**2)) >= min_mse else None
+
+    fluctuation = e - offset
+    mse = float(np.mean(fluctuation**2))
     if mse < min_mse:
-        return LoopResult(None, None, mse, None, sigma_op, n, b, m, "zero_error")
+        return LoopResult(None, None, offset, pi_raw, mse, None, sigma_op, n, b, m, "no_fluctuation")
 
-    # Linha i: [1, e(t), e(t-1), ..., e(t-m+1)] com t = i + m - 1; alvo e(t + b)  (eq. 1)
-    lags = np.column_stack([e[m - 1 - j : m - 1 - j + rows] for j in range(m)])
-    x = np.column_stack([np.ones(rows), lags])
-    y = e[m - 1 + b : m - 1 + b + rows]
-    coef, *_ = np.linalg.lstsq(x, y, rcond=None)
-    residual = y - x @ coef
-    residual_var = float(np.var(residual))
-
-    ratio = residual_var / mse
-    pi = min(1.0, max(0.0, 1.0 - ratio))
-    return LoopResult(pi, ratio, mse, residual_var, sigma_op, n, b, m)
+    pi, ratio, residual_var = _fit_pi(fluctuation, b, m, rows)
+    return LoopResult(pi, ratio, offset, pi_raw, mse, residual_var, sigma_op, n, b, m)

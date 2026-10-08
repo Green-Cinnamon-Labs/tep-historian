@@ -27,14 +27,24 @@ def test_slow_autocorrelated_error_is_predictable():
     assert r.pi is not None and r.pi > 0.8, r
 
 
-def test_constant_offset_is_fully_predictable():
+def test_constant_offset_has_no_fluctuation_and_is_reported_apart():
     r = pi_of(np.full(500, 2.0))
-    assert r.pi == 1.0, r
+    assert r.pi is None and r.reason == "no_fluctuation"
+    assert r.offset == 2.0
+    assert r.pi_raw == 1.0  # sobre o erro bruto o offset parece "perfeitamente previsível"
+
+
+def test_offset_does_not_inflate_the_index():
+    # Ruído branco em torno de um offset grande: PI bruto ~1 (artefato), PI da flutuação ~0
+    r = pi_of(9.4 + RNG.normal(0, 0.3, 2000))
+    assert abs(r.offset - 9.4) < 0.05
+    assert r.pi_raw > 0.95
+    assert r.pi < 0.05
 
 
 def test_identically_zero_error_has_no_index():
     r = pi_of(np.zeros(500))
-    assert r.pi is None and r.reason == "zero_error"
+    assert r.pi is None and r.reason == "no_fluctuation" and r.pi_raw is None
 
 
 def test_too_few_samples_has_no_index():
