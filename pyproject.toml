@@ -11,6 +11,7 @@ python = "^3.11"
 fastapi = "^0.115"
 uvicorn = {extras = ["standard"], version = "^0.34"}
 asyncua = "^2.0"
+numpy = "^2.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"

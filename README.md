@@ -15,6 +15,7 @@ It knows nothing about TEP. Every node under the `Signals` folder of the OPC-UA 
 | GET    | `/healthz`   | Collection state: connected, last sample time, last error, number of series |
 | GET    | `/signals`   | Keys available in the buffer                                                |
 | POST   | `/aggregate` | Window statistics for the requested keys                                    |
+| POST   | `/loop-performance` | Predictability Index (Bradu et al. 2017) of each requested control loop |
 
 ```bash
 curl -s localhost:8090/aggregate -H 'content-type: application/json' \
@@ -32,7 +33,22 @@ curl -s localhost:8090/aggregate -H 'content-type: application/json' \
 }
 ```
 
-Unknown keys are listed in `missing`. A known key with no samples in the window returns `count: 0` and `null` statistics.
+Unknown keys are listed in `missing`.
+
+### Control-loop performance
+
+`POST /loop-performance` computes, for each loop, the **Predictability Index** of Bradu et al. (2017): an autoregressive model is fitted to the error `e = SP − PV` and asked to predict it `b` samples ahead. PI ≈ 1 means a regular, predictable loop; PI ≈ 0 means an erratic error, like white noise. The historian only computes; judging against a threshold is the supervisor's job.
+
+```bash
+curl -s localhost:8090/loop-performance -H 'content-type: application/json' -d '{
+  "window_s": 300, "sample_interval_s": 1,
+  "loops": [{"name": "separator_level", "pv": "xmeas.separator.level", "sp": 50,
+             "op": "valve.separator_underflow.position", "time_constant_s": 30}]}'
+```
+
+Per loop it returns `pi`, the raw ratio `σ²_r / mse` (`ratio`), `mse`, the residual variance, `sigma_op` (standard deviation of the controller output, for the article's variability gate), and the article's parameters `n`, `b = ceil(T / t_s)`, `m = 2b`. `pi` is `null` with a `reason` when it can't be computed (`too_few_samples`, `zero_error`, `missing_signal`).
+
+The article prints the index as `σ²_r / mse` but describes PI = 1 for a predictable loop and 0 for white noise; that scale requires `1 − σ²_r / mse`, which is what is implemented (see `loop_performance.py`). A known key with no samples in the window returns `count: 0` and `null` statistics.
 
 ## Configuration
 
