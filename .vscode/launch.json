@@ -6,7 +6,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "tep_historian",
-            "console": "integratedTerminal",
+            "console": "internalConsole",
             "cwd": "${workspaceFolder}",
             "env": {
                 "OPCUA_ENDPOINT": "opc.tcp://127.0.0.1:4840/tep/server/",
